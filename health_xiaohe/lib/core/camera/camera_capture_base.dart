@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 abstract class CameraCaptureBase {
   Future<bool> hasPermission();
+  Future<bool> requestPermission();
   Future<void> startCapture(void Function(String base64Jpeg) onFrame);
   Future<void> stopCapture();
   void dispose();

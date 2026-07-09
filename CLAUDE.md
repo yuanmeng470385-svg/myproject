@@ -46,7 +46,7 @@ app/
 │   ├── models/            # SQLAlchemy模型 (User, HealthRecord, Conversation, Message, UserProfile, Memory)
 │   ├── routers/           # API路由 (auth, health, consult, voice, user_profile)
 │   ├── schemas/           # Pydantic schemas
-│   ├── services/          # 业务逻辑 (auth_service, health_service, ai_service)
+│   ├── services/          # 业务逻辑 (auth_service, health_service, ai_service, memory_service)
 │   ├── utils/             # 工具函数 (security, deps)
 │   ├── tests/             # pytest测试 (SQLite隔离)
 │   ├── main.py            # FastAPI入口
@@ -54,13 +54,18 @@ app/
 │   └── config.py          # pydantic-settings, 从.env读取
 ├── start_dev.ps1          # Flutter Web 一键启动 (PowerShell, 后端 + Flutter Chrome)
 ├── start_web.bat          # xiaohe-web 一键启动 (cmd, 后端 :8002 + Vite :5180)
+├── xiaohe-web/            # Vue 3 Web 前端
+├── app_harmony/           # HarmonyOS ArkTS 原生应用
 └── docs/                  # 项目文档
     ├── README.md           # 快速上手和常用命令
     ├── 架构说明.md         # Clean Architecture 分层详解
     ├── 数据流图.md         # 端到端数据流（前端 ↔ 后端 ↔ DashScope）
     ├── 语音通话实现.md     # DashScope Realtime 集成细节
     ├── 部署打包.md         # 构建、部署、测试
-    └── design/             # 设计规范和原型
+    ├── 技术报告.md         # 课程答辩技术报告
+    ├── PPT讲稿.md          # PPT 讲稿源文件
+    ├── design/             # 设计规范和原型
+    └── superpowers/        # AI 辅助开发规划文档
 ```
 
 ## 常用命令
@@ -242,11 +247,12 @@ Flutter使用 `go_router` 和 `ShellRoute` 实现底部导航栏:
                              ├── /ai-impression (AI 画像 + 长期记忆，原 /health-records)
                              ├── /chat-history (对话历史列表)
                              ├── /profile (个人中心)
-                             ├── /call (语音通话)
+                             ├── /call (语音通话，全屏页面，不在 ShellRoute 内)
+                             ├── /settings (设置页，全屏页面)
                              └── /chat-history/:conversationId (对话详情)
 ```
 
-底部导航栏4个tab: **咨询、画像、历史、我的**。`/ai-impression` 由 `user_profile_page.dart` 渲染，调用 `/api/user/profile` 展示用户画像和长期记忆。
+底部导航栏4个tab: **咨询、画像、历史、我的**。`/ai-impression` 由 `user_profile_page.dart` 渲染，调用 `/api/user/profile` 展示用户画像和长期记忆。`/call` 和 `/settings` 是独立全屏路由（不使用底部导航栏）。
 
 > 历史命名: 路由常量是 `AppRouter.aiImpression` (commit `7f2de59` 重命名)。旧代码/文档里的 `/health-records` 已废弃。
 
@@ -273,8 +279,31 @@ Flutter使用 `go_router` 和 `ShellRoute` 实现底部导航栏:
 - 底部导航是自定义 `widgets/common/app_bottom_nav.dart`(非 Material `BottomNavigationBar`)。
 
 ### API 端口
-- 开发环境: `http://localhost:8002` (Flutter `ApiEndpoints.baseUrl` 和 uvicorn 默认端口一致)
-- 模拟器环境: `http://192.168.1.84:8002` (Mumu模拟器通过WiFi连接宿主机局域网IP)
+
+Flutter 端 `core/network/api_endpoints.dart` 通过 `--dart-define` 注入环境变量，支持不同环境切换：
+
+```bash
+# 默认走远程服务器（无需 --dart-define）
+flutter run -d chrome
+
+# 连本地后端
+flutter run --dart-define=API_HOST=localhost -d chrome
+
+# 连局域网 IP（手机/模拟器真机联调）
+flutter run --dart-define=API_HOST=192.168.x.y -d chrome
+
+# 改端口 / HTTPS
+flutter run --dart-define=API_HOST=localhost --dart-define=API_PORT=8003
+flutter run --dart-define=API_HOST=myserver.com --dart-define=API_SCHEME=https
+```
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `API_HOST` | `118.31.166.235` | 后端服务器地址 |
+| `API_PORT` | `8002` | 后端端口 |
+| `API_SCHEME` | `http` | 协议 |
+
+鸿蒙端 `common/net/Api.ets` 的 `baseUrl` 默认 `http://10.0.2.2:8002`（模拟器—宿主机 NAT 映射），真机需改为同网段局域网 IP。
 
 > **Android 明文 HTTP 联调**: Android 默认禁止明文 HTTP，连不上 `:8002` 开发后端。`AndroidManifest.xml` 已开 `usesCleartextTraffic="true"` + `networkSecurityConfig="@xml/network_security_config"`，白名单仅放行 `localhost`、`10.0.2.2`(标准 AVD 宿主机)、`192.168.1.84` 网段；换局域网 IP 联调时需同步改 `res/xml/network_security_config.xml`。release 接 HTTPS 时 `base-config` 不放行公网明文。Android 权限 (`INTERNET`/`RECORD_AUDIO`/`CAMERA`) 也在该 manifest 声明。
 
@@ -290,7 +319,18 @@ npm run dev        # http://localhost:5180
 
 更便捷的入口：根目录的 `start_web.bat` 会同时检查环境、起后端（uvicorn :8002 --reload，等 `/health` 200 后）、起 Vite（:5180，自动打开 Chrome），并把两边日志拆到独立 cmd 窗口。停止服务直接关那两个弹窗即可。
 
-页面：`/`(landing) · `/login` · `/chat`(流式 + markdown) · `/history` · `/profile` · `/records`。流式聊天用 fetch + ReadableStream（不能用 EventSource — 后端 `POST /api/consult/chat/stream` 需要 `Authorization` header），前端有打字机节流（默认 60 字/秒）。AI 回复经 `marked` + `dompurify` 渲染 markdown。
+页面：`/`(landing) · `/login` · `/chat`(流式 + markdown) · `/call`(语音通话) · `/history` · `/profile` · `/records`。流式聊天用 fetch + ReadableStream（不能用 EventSource — 后端 `POST /api/consult/chat/stream` 需要 `Authorization` header），前端有打字机节流（默认 60 字/秒）。AI 回复经 `marked` + `dompurify` 渲染 markdown。
+
+语音/视频通话模块（`src/lib/`）：
+
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| voice-session | `voice-session.ts` | WebSocket 连接管理，对标 Flutter VoiceBloc |
+| audio/recorder | `audio/recorder.ts` | 浏览器麦克风采集 (AudioContext + ScriptProcessor, 16kHz PCM) |
+| audio/player | `audio/player.ts` | PCM→WAV 播放 |
+| video/camera | `video/camera.ts` | getUserMedia 摄像头采集，Canvas 定时截图 JPEG 帧上行 |
+
+> `voice-session.ts` 维护 WebSocket 生命周期和回调（onText/onAudio/onUserText/onAiText/onDone/onError），与后端 `/api/consult/voice/ws` 协议一致。通话页面 `CallPage.vue` 使用这些模块实现完整的语音+视频通话 UI。
 
 ### web 端踩过的坑（修过的真 bug，值得防范）
 
@@ -321,3 +361,70 @@ npm run dev        # http://localhost:5180
   - `{ suggestions: [...] }` — 跟问建议
 - 终止符：`data: [DONE]\n\n`
 - 必须在 response header 设 `X-Accel-Buffering: no` 否则某些反代会缓冲整段才发
+
+## 第三前端: app_harmony (HarmonyOS ArkTS)
+
+除了 Flutter 和 Vue Web 端，还有一个 HarmonyOS 原生应用 `app_harmony/` —— 鸿蒙 ArkTS + ArkUI 实现，对标 Flutter 端功能，对接同一 `:8002` 后端。
+
+### 开发环境
+
+- **IDE**: DevEco Studio
+- **SDK**: HarmonyOS 6.0.2(22) (API 22)
+- **构建**: hvigor (鸿蒙原生构建系统)
+- **测试框架**: @ohos/hypium (类似 Jest 风格)
+
+```bash
+# 用 DevEco Studio 打开 app_harmony/ 目录
+# 或命令行编译（需配置 hvigor 环境）
+cd app_harmony
+hvigorw assembleHap --mode module -p product=default -p buildMode=debug
+```
+
+### 目录结构
+
+```
+app_harmony/
+├── build-profile.json5              # 项目级构建配置
+├── oh-package.json5                 # 依赖声明 (hypium/hamock for test)
+├── hvigorfile.ts                    # 构建脚本
+├── AppScope/
+│   └── app.json5                    # 应用包名 + 图标
+└── entry/                           # 主模块
+    └── src/main/
+        ├── module.json5             # 模块配置: 权限(INTERNET/MIC/CAM), abilities
+        ├── resources/base/element/  # 字符串/颜色资源（支持深色模式 .dark/）
+        └── ets/
+            ├── entryability/        # EntryAbility (应用入口)
+            ├── pages/               # 页面: Splash, Login, Main, Call, ConversationDetail, Settings
+            ├── views/               # Tab 内嵌视图: ChatHomeView, UserProfileView, ChatHistoryView, PersonalCenterView
+            ├── components/          # 复用组件: MarkdownText
+            └── common/
+                ├── net/             # ApiClient (HTTP) + VoiceClient (WebSocket) + Api (端点常量)
+                ├── audio/           # AudioEngine: 16k PCM 采集 + 24k PCM 播放
+                ├── camera/          # CameraEngine: XComponent 预览 + 定时抓 JPEG 帧
+                ├── storage/         # Prefs: 本地 KV 存储 (token 等)
+                └── theme/           # Tokens: 圆角/间距/字号; 颜色走 $r('app.color.*')
+```
+
+### 架构要点
+
+- **无状态管理框架**: 直接用 `@State` + `@Prop` + `@Provide`/`@Consume` 驱动 UI，**没有引入 BLoC/Redux 类库**。
+- **Tabs 底部导航**: `Main.ets` 用系统 `Tabs` 组件实现 4 tab（咨询/画像/历史/我的），对标 Flutter ShellRoute。
+- **网络层**: `ApiClient` 基于 `@ohos.net.http` 自动带 JWT；`VoiceClient` 基于 `@ohos.net.webSocket`，JSON 协议与 Flutter VoiceBloc 的 WebSocketClient 完全一致。
+- **音频引擎**: `AudioEngine` 用 `AudioCapturer` 16kHz 采集 → PCM base64 → VoiceClient 上行；下行 base64 解码 → `AudioRenderer` 24kHz 播放。**噪声门未实现**（接口预留但未启用）。
+- **摄像头引擎**: `CameraEngine` 用 `PhotoSession` + XComponent surface 做预览，定时 ~1.5s 抓 JPEG 帧转 base64 上行。
+- **主题**: 颜色走 `$r('app.color.*')` 资源引用，HarmonyOS 自动按浅色/深色模式切换。非颜色 token 在 `Tokens.ets`。
+- **API 端点**: `Api.ets` 与 Flutter 端对齐；baseUrl 默认 `http://10.0.2.2:8002`（模拟器→宿主机 NAT），真机需改同网段 IP。
+
+### 与 Flutter 端的差异
+
+| 方面 | Flutter (health_xiaohe) | HarmonyOS (app_harmony) |
+|------|------------------------|------------------------|
+| 状态管理 | BLoC | @State / @Provide |
+| 路由 | go_router | @ohos.router |
+| 网络 | dio + web_socket_channel | @ohos.net.http / webSocket |
+| 音频 | 条件导入 (web/android/stub) | AudioCapturer / AudioRenderer |
+| 摄像头 | 条件导入 (web/android) | CameraKit PhotoSession + XComponent |
+| 噪声门 | gateOn/gateOff | 未实现（接口预留） |
+| 深色模式 | ThemeController + Provider | 系统资源 .dark/ 目录自动切换 |
+| 健康记录 | HealthBloc + HealthRecordsPage | 未实现 |

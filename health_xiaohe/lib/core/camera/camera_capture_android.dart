@@ -40,6 +40,17 @@ class CameraCapture extends CameraCaptureBase {
     }
   }
 
+  @override
+  Future<bool> requestPermission() async {
+    try {
+      final cameras = await availableCameras();
+      return cameras.isNotEmpty;
+    } catch (e) {
+      debugPrint('[Camera] requestPermission failed: $e');
+      return false;
+    }
+  }
+
   CameraController? get controller => _controller;
 
   @override

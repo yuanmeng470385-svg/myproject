@@ -31,25 +31,14 @@ struct Call {
   private pingTimer: number = -1;
 
   async aboutToAppear(): Promise<void> {
-    // 取当前会话 id，传给后端把语音内容并入同一对话
     const params = router.getParams() as CallParams;
     const convId: string = (params !== null && params !== undefined && params.conversationId !== undefined)
       ? params.conversationId : '';
 
-    // 申请麦克风权限
-    try {
-      const ctx = getContext(this) as common.UIAbilityContext;
-      const atManager = abilityAccessCtrl.createAtManager();
-      const perms: Permissions[] = ['ohos.permission.MICROPHONE', 'ohos.permission.CAMERA'];
-      await atManager.requestPermissionsFromUser(ctx, perms);
-    } catch (e) {
-      // 忽略，连接后启动音频时若无权限会失败提示
-    }
-
     this.client.onConnected = (cid: string) => {
       this.connected = true;
       this.status = '已连接 · 请说话';
-      this.startAudio();
+      this.requestPermsAndStartAudio();
     };
     this.client.onText = (t: string) => {
       // AI 流式 delta；完整转录走 onAiText，避免重复，这里不追加
@@ -83,6 +72,20 @@ struct Call {
     }, 15000);
   }
 
+  // 申请麦克风权限后再启动音频（权限弹窗需要页面已渲染、context 就绪）
+  private async requestPermsAndStartAudio(): Promise<void> {
+    try {
+      const ctx: common.UIAbilityContext =
+        this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const atManager: abilityAccessCtrl.AtManager = abilityAccessCtrl.createAtManager();
+      const perms: Permissions[] = ['ohos.permission.MICROPHONE'];
+      await atManager.requestPermissionsFromUser(ctx, perms);
+    } catch (e) {
+      // 权限被拒或失败，仍尝试启动音频（让 AudioEngine 自报错）
+    }
+    await this.startAudio();
+  }
+
   private async startAudio(): Promise<void> {
     try {
       await this.engine.startPlayback();
@@ -97,7 +100,11 @@ struct Call {
 
   private async startVideo(surfaceId: string): Promise<void> {
     try {
-      const ctx = getContext(this) as common.UIAbilityContext;
+      const ctx: common.UIAbilityContext =
+        this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const atManager2: abilityAccessCtrl.AtManager = abilityAccessCtrl.createAtManager();
+      const camPerms: Permissions[] = ['ohos.permission.CAMERA'];
+      await atManager2.requestPermissionsFromUser(ctx, camPerms);
       this.cameraEngine.onFrame = (b64: string) => {
         this.client.sendImage(b64);
       };

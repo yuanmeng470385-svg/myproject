@@ -38,6 +38,9 @@ class CameraCapture extends CameraCaptureBase {
   }
 
   @override
+  Future<bool> requestPermission() => hasPermission();
+
+  @override
   Future<void> startCapture(void Function(String base64Jpeg) onFrame) async {
     _capturing = true;
     _frameCount = 0;

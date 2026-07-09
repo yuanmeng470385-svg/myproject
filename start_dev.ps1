@@ -1,4 +1,5 @@
-# 健康小云 — 一键启动开发环境
+﻿# 健康小云 — 一键启动开发环境
+#cd D:\gongsi\app
 # 用法: .\start_dev.ps1          # 启动全部
 #       .\start_dev.ps1 -Backend  # 仅启动后端
 #       .\start_dev.ps1 -Frontend # 仅启动前端

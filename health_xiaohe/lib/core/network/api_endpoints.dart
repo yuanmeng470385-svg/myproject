@@ -11,7 +11,7 @@ class ApiEndpoints {
   //   改端口:      flutter run --dart-define=API_PORT=8003
   //   走 HTTPS:    flutter run --dart-define=API_SCHEME=https
   static const String _host =
-      String.fromEnvironment('API_HOST', defaultValue: '192.168.1.84');
+      String.fromEnvironment('API_HOST', defaultValue: '118.31.166.235');
   static const String _port =
       String.fromEnvironment('API_PORT', defaultValue: '8002');
   static const String _scheme =

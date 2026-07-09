@@ -81,7 +81,7 @@ onUnmounted(() => {
           </div>
           <div>
             <span class="meta-label">runs on</span>
-            <span class="meta-value">阿里云百炼 · qwen3.5-omni</span>
+            <span class="meta-value">健康小云大模型</span>
           </div>
         </div>
       </div>
