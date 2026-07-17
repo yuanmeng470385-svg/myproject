@@ -36,17 +36,10 @@ Stream<SseChunk> fetchSseStream({
             }
             try {
               final json = jsonDecode(data);
-              final content = json['content'];
-              final convId = json['conversation_id'];
-              final suggestions = json['suggestions'];
-              if (suggestions != null && suggestions is List) {
-                controller.add(SseChunk(suggestions: suggestions.cast<String>()));
-              }
-              if (content != null && content.toString().isNotEmpty) {
-                controller.add(SseChunk(content: content.toString()));
-              }
-              if (convId != null && convId.toString().isNotEmpty) {
-                controller.add(SseChunk(conversationId: convId.toString()));
+              if (json is Map<String, dynamic>) {
+                for (final c in SseChunk.fromEventJson(json)) {
+                  controller.add(c);
+                }
               }
             } catch (_) {}
           }
