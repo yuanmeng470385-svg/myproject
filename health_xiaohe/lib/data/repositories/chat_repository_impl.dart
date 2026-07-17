@@ -25,6 +25,7 @@ class ChatRepositoryImpl implements ChatRepository {
     final apiMessages = messages.map((m) => m.toApiFormat()).toList();
     final body = <String, dynamic>{
       'messages': apiMessages,
+      'agent_mode': true, // Agent 模式默认全开，是否调工具由 AI 决定
       if (conversationId != null) 'conversation_id': conversationId,
     };
 

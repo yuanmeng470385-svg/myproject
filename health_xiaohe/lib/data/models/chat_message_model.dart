@@ -5,17 +5,21 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:health_xiaohe/data/models/agent_step.dart';
+
 class ChatMessageModel {
   final String role; // 'user' or 'assistant'
   final String content;
   final DateTime? timestamp;
   final Uint8List? imageBytes; // 图片数据
+  final List<AgentStep>? agentSteps; // Agent 工具调用步骤（仅会话内，不随 toApiFormat 发送）
 
   ChatMessageModel({
     required this.role,
     required this.content,
     this.timestamp,
     this.imageBytes,
+    this.agentSteps,
   });
 
   factory ChatMessageModel.user(String content, {Uint8List? imageBytes}) {
@@ -64,12 +68,14 @@ class ChatMessageModel {
     String? content,
     DateTime? timestamp,
     Uint8List? imageBytes,
+    List<AgentStep>? agentSteps,
   }) {
     return ChatMessageModel(
       role: role ?? this.role,
       content: content ?? this.content,
       timestamp: timestamp ?? this.timestamp,
       imageBytes: imageBytes ?? this.imageBytes,
+      agentSteps: agentSteps ?? this.agentSteps,
     );
   }
 }
