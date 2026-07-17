@@ -187,15 +187,30 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     }
   }
 
+  /// 流中断/结束时闭合最后一条 assistant 消息里仍在 running 的步骤，避免 spinner 永转
+  List<ChatMessageModel> _closeRunningSteps(List<ChatMessageModel> messages) {
+    if (messages.isEmpty || !messages.last.isAssistant) return messages;
+    final last = messages.last;
+    final steps = last.agentSteps;
+    if (steps == null || !steps.any((s) => s.isRunning)) return messages;
+    final closed = steps.map((s) => s.isRunning ? s.asDone('') : s).toList();
+    return [...messages.sublist(0, messages.length - 1), last.copyWith(agentSteps: closed)];
+  }
+
   void _onStreamCompleted(ChatStreamCompleted event, Emitter<ChatState> emit) {
-    emit(state.copyWith(isLoading: false, isStreaming: false));
+    emit(state.copyWith(
+      messages: _closeRunningSteps(state.messages),
+      isLoading: false,
+      isStreaming: false,
+    ));
   }
 
   void _onStreamError(ChatStreamError event, Emitter<ChatState> emit) {
-    final messages = [...state.messages];
+    var messages = [...state.messages];
     if (messages.isNotEmpty && messages.last.isAssistant && messages.last.content.isEmpty) {
       messages.removeLast();
     }
+    messages = _closeRunningSteps(messages);
     emit(state.copyWith(messages: messages, isLoading: false, isStreaming: false, error: event.error));
   }
 

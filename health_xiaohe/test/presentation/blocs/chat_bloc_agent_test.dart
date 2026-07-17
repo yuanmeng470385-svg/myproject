@@ -113,4 +113,38 @@ void main() {
           .having((s) => s.agentThinking, 'agentThinking', isNull),
     ],
   );
+
+  blocTest<ChatBloc, ChatState>(
+    'ChatStreamError 闭合 running 步骤（流中断不留转圈）',
+    build: () => ChatBloc(repo),
+    seed: () => ChatState(messages: [
+      ChatMessageModel.user('查血压'),
+      ChatMessageModel.assistant('部分回答').copyWith(agentSteps: const [
+        AgentStep(tool: 'query_health_records'),
+      ]),
+    ]),
+    act: (bloc) => bloc.add(const ChatStreamError('网络中断')),
+    expect: () => [
+      isA<ChatState>()
+          .having((s) => s.error, 'error', '网络中断')
+          .having((s) => s.messages.last.agentSteps!.single.isRunning, 'running', false),
+    ],
+  );
+
+  blocTest<ChatBloc, ChatState>(
+    'ChatStreamCompleted 闭合遗留的 running 步骤',
+    build: () => ChatBloc(repo),
+    seed: () => ChatState(messages: [
+      ChatMessageModel.user('查血压'),
+      ChatMessageModel.assistant('回答').copyWith(agentSteps: const [
+        AgentStep(tool: 'calculator'),
+      ]),
+    ]),
+    act: (bloc) => bloc.add(ChatStreamCompleted()),
+    expect: () => [
+      isA<ChatState>()
+          .having((s) => s.isStreaming, 'streaming', false)
+          .having((s) => s.messages.last.agentSteps!.single.isRunning, 'running', false),
+    ],
+  );
 }
