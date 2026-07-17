@@ -10,6 +10,7 @@ class ChatState extends Equatable {
   final bool isLoading;
   final bool isStreaming; // AI 流式输出进行中
   final String? error;
+  final String? agentThinking; // Agent 思考提示（瞬态：任何 copyWith 不显式携带即清空）
   final String? conversationId;
   final List<String> suggestions; // AI 推荐的追问
   final List<String> welcomeSuggestions; // 欢迎页基于画像生成的快捷问题
@@ -19,6 +20,7 @@ class ChatState extends Equatable {
     this.isLoading = false,
     this.isStreaming = false,
     this.error,
+    this.agentThinking,
     this.conversationId,
     this.suggestions = const [],
     this.welcomeSuggestions = const [],
@@ -29,6 +31,7 @@ class ChatState extends Equatable {
     bool? isLoading,
     bool? isStreaming,
     String? error,
+    String? agentThinking,
     String? conversationId,
     List<String>? suggestions,
     List<String>? welcomeSuggestions,
@@ -38,6 +41,7 @@ class ChatState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       isStreaming: isStreaming ?? this.isStreaming,
       error: error,
+      agentThinking: agentThinking,
       conversationId: conversationId ?? this.conversationId,
       suggestions: suggestions ?? this.suggestions,
       welcomeSuggestions: welcomeSuggestions ?? this.welcomeSuggestions,
@@ -45,5 +49,5 @@ class ChatState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [messages, isLoading, isStreaming, error, conversationId, suggestions, welcomeSuggestions];
+  List<Object?> get props => [messages, isLoading, isStreaming, error, agentThinking, conversationId, suggestions, welcomeSuggestions];
 }

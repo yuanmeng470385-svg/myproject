@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:health_xiaohe/data/models/agent_step.dart';
 import 'package:health_xiaohe/data/models/chat_message_model.dart';
 import 'package:health_xiaohe/data/models/sse_chunk.dart';
 import 'package:health_xiaohe/domain/repositories/chat_repository.dart';
@@ -107,6 +108,58 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   void _onReceiveChunk(ChatReceiveStreamChunk event, Emitter<ChatState> emit) {
     final chunk = event.chunk;
+
+    // Agent 状态事件（必须在 content 之前处理）
+    if (chunk.hasAgentStatus) {
+      final ev = chunk.agentStatus!;
+      final status = ev['status'];
+      if (status == 'thinking') {
+        emit(state.copyWith(
+          messages: state.messages,
+          agentThinking: ev['content']?.toString(),
+        ));
+        return;
+      }
+      if (status == 'tool_call' || status == 'tool_result') {
+        final updated = [...state.messages];
+        if (updated.isEmpty || !updated.last.isAssistant) return;
+        final last = updated.removeLast();
+        final steps = [...(last.agentSteps ?? const <AgentStep>[])];
+        if (status == 'tool_call') {
+          final rawArgs = ev['args'];
+          steps.add(AgentStep(
+            tool: ev['tool']?.toString() ?? '',
+            args: rawArgs is Map ? Map<String, dynamic>.from(rawArgs) : null,
+          ));
+        } else {
+          final tool = ev['tool']?.toString() ?? '';
+          final idx = steps.lastIndexWhere((s) => s.tool == tool && s.isRunning);
+          if (idx >= 0) {
+            steps[idx] = steps[idx].asDone(ev['result']?.toString() ?? '');
+          }
+        }
+        updated.add(last.copyWith(agentSteps: steps));
+        emit(state.copyWith(messages: updated, isLoading: false));
+        return;
+      }
+      if (status == 'error') {
+        final updated = [...state.messages];
+        if (updated.isNotEmpty && updated.last.isAssistant) {
+          final last = updated.removeLast();
+          final steps = (last.agentSteps ?? const <AgentStep>[])
+              .map((s) => s.isRunning ? s.asDone('') : s)
+              .toList();
+          updated.add(last.copyWith(agentSteps: steps));
+        }
+        emit(state.copyWith(
+          messages: updated,
+          isLoading: false,
+          error: ev['content']?.toString() ?? 'Agent 处理出错',
+        ));
+        return;
+      }
+      return; // 未知 status 忽略
+    }
 
     // 处理追问建议
     if (chunk.hasSuggestions) {
