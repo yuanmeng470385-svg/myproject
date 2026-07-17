@@ -4,7 +4,7 @@
 // ============================================================
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:health_xiaohe/core/constants/app_colors.dart';
 import 'package:health_xiaohe/core/constants/app_radius.dart';
 import 'package:health_xiaohe/core/constants/app_shadows.dart';

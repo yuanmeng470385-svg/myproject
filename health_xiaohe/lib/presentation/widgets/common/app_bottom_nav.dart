@@ -3,7 +3,7 @@
 // 人工修改：经开发者 review、测试反馈与需求确认后迭代调整
 // ============================================================
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:health_xiaohe/core/constants/app_colors.dart';
 import 'package:health_xiaohe/core/constants/app_motion.dart';
 import 'package:health_xiaohe/core/constants/app_typography.dart';

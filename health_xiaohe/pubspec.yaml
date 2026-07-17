@@ -40,10 +40,9 @@ dependencies:
   # YUV420 摄像头帧 → JPEG 转码（在 isolate 内，见 camera_capture_android.dart）
   image: ^4.0.0
   # 线性图标库(底部导航等)
-  lucide_icons: ^0.257.0
-
   # File system
   path_provider: ^2.1.1
+  lucide_icons_flutter: ^3.1.15
 
 dev_dependencies:
   flutter_test:
