@@ -203,6 +203,7 @@ async function send(content?: string) {
         // typewriter loop will set streaming=false + sending=false once it catches up
       },
       onError: (e: any) => {
+        aiMsg.steps?.forEach((s) => (s.running = false));
         aiMsg.receiving = false;
         aiMsg.streaming = false;
         sending.value = false;
@@ -230,6 +231,7 @@ function stop() {
     if (last.fullContent && last.content !== last.fullContent) {
       last.content = last.fullContent;
     }
+    last.steps?.forEach((s) => (s.running = false));
     last.streaming = false;
   }
 }
