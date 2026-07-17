@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { streamChat, type ChatMessage } from "../services/chat";
+import { streamChat, AGENT_TOOL_LABELS, type AgentStep, type ChatMessage } from "../services/chat";
 import { conv } from "../services/api";
 import { renderMarkdown } from "../lib/markdown";
 import AppNav from "../components/AppNav.vue";
@@ -17,6 +17,12 @@ interface UIMsg extends ChatMessage {
   receiving?: boolean;
   /** umbrella flag: receiving from net OR typewriter still catching up */
   streaming?: boolean;
+  /** agent tool-call steps (session-only, not persisted) */
+  steps?: AgentStep[];
+  /** transient thinking hint from agent_status */
+  thinkingText?: string;
+  /** steps panel expanded after completion (during receiving it's always open) */
+  stepsOpen?: boolean;
 }
 
 const router = useRouter();
@@ -41,6 +47,8 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 let abortCtrl: AbortController | null = null;
 let idSeq = 0;
 function nextId() { return ++idSeq; }
+
+const toolLabel = (t: string) => AGENT_TOOL_LABELS[t] ?? t;
 
 const greeting = computed(() => {
   const h = new Date().getHours();
@@ -133,6 +141,8 @@ async function send(content?: string) {
     fullContent: "",
     receiving: true,
     streaming: true,
+    steps: [],
+    thinkingText: "",
   });
   messages.value.push(userMsg, aiMsg);
   input.value = "";
@@ -154,6 +164,31 @@ async function send(content?: string) {
   await streamChat(
     payload,
     {
+      onAgentStatus: (ev) => {
+        if (ev.status === "thinking") {
+          aiMsg.thinkingText = ev.content || "";
+        } else if (ev.status === "tool_call") {
+          aiMsg.steps!.push({
+            tool: ev.tool ?? "",
+            args: ev.args,
+            result: null,
+            running: true,
+          });
+        } else if (ev.status === "tool_result") {
+          // 闭合最后一个同名 running 步骤
+          const steps = aiMsg.steps ?? [];
+          for (let i = steps.length - 1; i >= 0; i--) {
+            if (steps[i].running && steps[i].tool === ev.tool) {
+              steps[i].result = ev.result ?? "";
+              steps[i].running = false;
+              break;
+            }
+          }
+        } else if (ev.status === "error") {
+          aiMsg.steps?.forEach((s) => (s.running = false));
+          errorMsg.value = ev.content || "Agent 处理出错";
+        }
+      },
       onChunk: (delta) => {
         aiMsg.fullContent = (aiMsg.fullContent ?? "") + delta;
       },
@@ -338,11 +373,36 @@ onMounted(() => {
             </span>
           </span>
           <div class="content">
-            <span v-if="m.role === 'assistant' && !m.content && m.streaming" class="thinking italic-en">
-              正在听你说的话…
-            </span>
-            <template v-else-if="m.role === 'assistant'">
-              <span class="md" v-html="renderMarkdown(m.content)"></span><span v-if="m.streaming" class="caret">▍</span>
+            <template v-if="m.role === 'assistant'">
+              <!-- agent tool-call steps -->
+              <div v-if="m.steps && m.steps.length" class="agent-steps">
+                <button
+                  v-if="!m.receiving"
+                  class="steps-summary"
+                  @click="m.stepsOpen = !m.stepsOpen"
+                  data-hover
+                >
+                  ⚙ 已调用 {{ m.steps.length }} 个工具
+                  <span class="chev">{{ m.stepsOpen ? "▴" : "▾" }}</span>
+                </button>
+                <span v-else class="steps-summary passive">⚙ 正在调用工具</span>
+                <ul v-if="m.receiving || m.stepsOpen" class="steps-list">
+                  <li v-for="(s, si) in m.steps" :key="si" class="step">
+                    <button class="step-row" @click="s.open = !s.open" data-hover>
+                      <span v-if="s.running" class="step-spin" aria-hidden="true"></span>
+                      <span v-else class="step-check">✓</span>
+                      <span class="step-label">{{ toolLabel(s.tool) }}</span>
+                    </button>
+                    <pre v-if="s.open && s.result" class="step-result">{{ s.result }}</pre>
+                  </li>
+                </ul>
+              </div>
+              <span v-if="!m.content && m.streaming" class="thinking italic-en">
+                {{ m.thinkingText || "正在听你说的话…" }}
+              </span>
+              <template v-else>
+                <span class="md" v-html="renderMarkdown(m.content)"></span><span v-if="m.streaming" class="caret">▍</span>
+              </template>
             </template>
             <template v-else>{{ m.content }}</template>
           </div>
@@ -597,6 +657,71 @@ onMounted(() => {
 
 .thinking {
   color: var(--ink-quiet);
+}
+
+/* agent tool-call steps */
+.agent-steps {
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  background: rgba(168, 216, 197, 0.14);
+  border: 1px solid rgba(107, 143, 122, 0.16);
+  border-radius: 0.8rem;
+}
+.steps-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-quiet);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.steps-summary.passive { cursor: default; }
+.steps-summary .chev { font-size: 0.7rem; }
+.steps-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.step-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.step-check { color: var(--sage-deep); font-size: 0.8rem; }
+.step-spin {
+  width: 0.7rem; height: 0.7rem;
+  border: 2px solid rgba(107, 143, 122, 0.25);
+  border-top-color: var(--sage-deep);
+  border-radius: 50%;
+  animation: step-spin 0.8s linear infinite;
+}
+@keyframes step-spin { to { transform: rotate(360deg); } }
+.step-result {
+  margin: 0.3rem 0 0 1.15rem;
+  padding: 0.5rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--ink-quiet);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow-y: auto;
 }
 
 .caret {
