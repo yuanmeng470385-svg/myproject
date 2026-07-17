@@ -148,7 +148,8 @@ class _ChatHomePageState extends State<ChatHomePage> {
               buildWhen: (prev, cur) =>
                   !identical(prev.messages, cur.messages) ||
                   prev.isStreaming != cur.isStreaming ||
-                  prev.isLoading != cur.isLoading,
+                  prev.isLoading != cur.isLoading ||
+                  prev.agentThinking != cur.agentThinking,
               listener: (context, state) {
                 if (state.error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +187,11 @@ class _ChatHomePageState extends State<ChatHomePage> {
                     }
                     // 流式气泡 / 用户气泡：RepaintBoundary 把光标闪烁等重绘和列表其余部分隔离
                     return RepaintBoundary(
-                      child: MessageBubble(message: msg, isStreaming: streaming),
+                      child: MessageBubble(
+                        message: msg,
+                        isStreaming: streaming,
+                        thinkingText: streaming ? state.agentThinking : null,
+                      ),
                     );
                   },
                 );

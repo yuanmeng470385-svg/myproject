@@ -10,18 +10,20 @@ import 'package:health_xiaohe/core/constants/app_motion.dart';
 import 'package:health_xiaohe/core/constants/app_radius.dart';
 import 'package:health_xiaohe/core/constants/app_shadows.dart';
 import 'package:health_xiaohe/data/models/chat_message_model.dart';
+import 'package:health_xiaohe/presentation/widgets/chat/agent_steps_card.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessageModel message;
   final bool isStreaming;
+  final String? thinkingText;
 
-  const MessageBubble({super.key, required this.message, this.isStreaming = false});
+  const MessageBubble({super.key, required this.message, this.isStreaming = false, this.thinkingText});
 
   @override
   Widget build(BuildContext context) {
     final child = message.isUser
         ? UserMessageBubble(message: message)
-        : AiMessageBubble(message: message, isStreaming: isStreaming);
+        : AiMessageBubble(message: message, isStreaming: isStreaming, thinkingText: thinkingText);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: AppMotion.base,
@@ -43,8 +45,9 @@ class MessageBubble extends StatelessWidget {
 class AiMessageBubble extends StatelessWidget {
   final ChatMessageModel message;
   final bool isStreaming;
+  final String? thinkingText;
 
-  const AiMessageBubble({super.key, required this.message, this.isStreaming = false});
+  const AiMessageBubble({super.key, required this.message, this.isStreaming = false, this.thinkingText});
 
   static final _styleSheet = MarkdownStyleSheet(
     h1: TextStyle(
@@ -150,6 +153,25 @@ class AiMessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Agent 工具调用步骤卡片
+                  if (message.agentSteps != null && message.agentSteps!.isNotEmpty)
+                    AgentStepsCard(
+                      steps: message.agentSteps!,
+                      isStreaming: isStreaming,
+                    ),
+                  // Agent 思考提示（仅内容尚未到达时）
+                  if (isStreaming && message.content.isEmpty && thinkingText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        thinkingText!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textTertiary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
                   if (message.content.isNotEmpty)
                     // 流式中用纯 Text：避免每 ~50ms 把不断变长的整段 Markdown
                     // 重新解析一遍 + SelectableText 的额外开销；完成后再渲染富文本
