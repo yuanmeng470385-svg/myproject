@@ -3,7 +3,7 @@
 - 日期：2026-07-17
 - 状态：已评审通过（待实施）
 - 范围：`health_xiaohe/`（Flutter，Android + Web 平台）、`xiaohe-web/`（Vue 3）
-- 不在范围：`app_harmony/` 鸿蒙端、语音通话页（WebSocket Realtime，与 Agent 无关）、历史对话步骤回溯
+- 不在范围：语音通话页（WebSocket Realtime，与 Agent 无关）、历史对话步骤回溯
 
 ## 1. 背景与目标
 

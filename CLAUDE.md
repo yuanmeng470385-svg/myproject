@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-健康小云是一个AI健康助手应用，包含Flutter移动端和Python FastAPI后端。
+健康小云是一个AI健康助手应用，包含 Flutter 移动端、Vue 3 Web 端和 Python FastAPI 后端。
 
 > **注意**: `backend/` 是 git submodule（gitlink，mode 160000），独立提交。修改后端代码时需要在 `backend/` 目录内单独 commit/push，再回根仓库提交 submodule 指针更新。
 >
@@ -46,7 +46,7 @@ app/
 │   ├── models/            # SQLAlchemy模型 (User, HealthRecord, Conversation, Message, UserProfile, Memory)
 │   ├── routers/           # API路由 (auth, health, consult, voice, user_profile)
 │   ├── schemas/           # Pydantic schemas
-│   ├── services/          # 业务逻辑 (auth_service, health_service, ai_service)
+│   ├── services/          # 业务逻辑 (auth_service, health_service, ai_service, memory_service)
 │   ├── utils/             # 工具函数 (security, deps)
 │   ├── tests/             # pytest测试 (SQLite隔离)
 │   ├── main.py            # FastAPI入口
@@ -54,13 +54,18 @@ app/
 │   └── config.py          # pydantic-settings, 从.env读取
 ├── start_dev.ps1          # Flutter Web 一键启动 (PowerShell, 后端 + Flutter Chrome)
 ├── start_web.bat          # xiaohe-web 一键启动 (cmd, 后端 :8002 + Vite :5180)
+├── xiaohe-web/            # Vue 3 Web 前端
+
 └── docs/                  # 项目文档
     ├── README.md           # 快速上手和常用命令
     ├── 架构说明.md         # Clean Architecture 分层详解
     ├── 数据流图.md         # 端到端数据流（前端 ↔ 后端 ↔ DashScope）
     ├── 语音通话实现.md     # DashScope Realtime 集成细节
     ├── 部署打包.md         # 构建、部署、测试
-    └── design/             # 设计规范和原型
+    ├── 技术报告.md         # 课程答辩技术报告
+    ├── PPT讲稿.md          # PPT 讲稿源文件
+    ├── design/             # 设计规范和原型
+    └── superpowers/        # AI 辅助开发规划文档
 ```
 
 ## 常用命令
@@ -242,11 +247,12 @@ Flutter使用 `go_router` 和 `ShellRoute` 实现底部导航栏:
                              ├── /ai-impression (AI 画像 + 长期记忆，原 /health-records)
                              ├── /chat-history (对话历史列表)
                              ├── /profile (个人中心)
-                             ├── /call (语音通话)
+                             ├── /call (语音通话，全屏页面，不在 ShellRoute 内)
+                             ├── /settings (设置页，全屏页面)
                              └── /chat-history/:conversationId (对话详情)
 ```
 
-底部导航栏4个tab: **咨询、画像、历史、我的**。`/ai-impression` 由 `user_profile_page.dart` 渲染，调用 `/api/user/profile` 展示用户画像和长期记忆。
+底部导航栏4个tab: **咨询、画像、历史、我的**。`/ai-impression` 由 `user_profile_page.dart` 渲染，调用 `/api/user/profile` 展示用户画像和长期记忆。`/call` 和 `/settings` 是独立全屏路由（不使用底部导航栏）。
 
 > 历史命名: 路由常量是 `AppRouter.aiImpression` (commit `7f2de59` 重命名)。旧代码/文档里的 `/health-records` 已废弃。
 
@@ -273,12 +279,31 @@ Flutter使用 `go_router` 和 `ShellRoute` 实现底部导航栏:
 - 底部导航是自定义 `widgets/common/app_bottom_nav.dart`(非 Material `BottomNavigationBar`)。
 
 ### API 端口
-- 开发环境: `http://localhost:8002` (Flutter `ApiEndpoints.baseUrl` 和 uvicorn 默认端口一致)
-- 模拟器环境: `http://192.168.1.84:8002` (Mumu模拟器通过WiFi连接宿主机局域网IP)
+
+Flutter 端 `core/network/api_endpoints.dart` 通过 `--dart-define` 注入环境变量，支持不同环境切换：
+
+```bash
+# 默认走远程服务器（无需 --dart-define）
+flutter run -d chrome
+
+# 连本地后端
+flutter run --dart-define=API_HOST=localhost -d chrome
+
+# 连局域网 IP（手机/模拟器真机联调）
+flutter run --dart-define=API_HOST=192.168.x.y -d chrome
+
+# 改端口 / HTTPS
+flutter run --dart-define=API_HOST=localhost --dart-define=API_PORT=8003
+flutter run --dart-define=API_HOST=myserver.com --dart-define=API_SCHEME=https
+```
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `API_HOST` | `118.31.166.235` | 后端服务器地址 |
+| `API_PORT` | `8002` | 后端端口 |
+| `API_SCHEME` | `http` | 协议 |
 
 > **Android 明文 HTTP 联调**: Android 默认禁止明文 HTTP，连不上 `:8002` 开发后端。`AndroidManifest.xml` 已开 `usesCleartextTraffic="true"` + `networkSecurityConfig="@xml/network_security_config"`，白名单仅放行 `localhost`、`10.0.2.2`(标准 AVD 宿主机)、`192.168.1.84` 网段；换局域网 IP 联调时需同步改 `res/xml/network_security_config.xml`。release 接 HTTPS 时 `base-config` 不放行公网明文。Android 权限 (`INTERNET`/`RECORD_AUDIO`/`CAMERA`) 也在该 manifest 声明。
-
-## 第二前端: xiaohe-web (Vite + Vue 3)
 
 除了 Flutter 端 `health_xiaohe/`，根目录另有一个 web 前端 `xiaohe-web/` —— 温柔生物形态美学的 SPA，Vite + Vue 3 + TS + Pinia + vue-router。直接对接 `:8002` 后端（vite 开发期 proxy `/api` → `localhost:8002`）。
 
@@ -290,7 +315,18 @@ npm run dev        # http://localhost:5180
 
 更便捷的入口：根目录的 `start_web.bat` 会同时检查环境、起后端（uvicorn :8002 --reload，等 `/health` 200 后）、起 Vite（:5180，自动打开 Chrome），并把两边日志拆到独立 cmd 窗口。停止服务直接关那两个弹窗即可。
 
-页面：`/`(landing) · `/login` · `/chat`(流式 + markdown) · `/history` · `/profile` · `/records`。流式聊天用 fetch + ReadableStream（不能用 EventSource — 后端 `POST /api/consult/chat/stream` 需要 `Authorization` header），前端有打字机节流（默认 60 字/秒）。AI 回复经 `marked` + `dompurify` 渲染 markdown。
+页面：`/`(landing) · `/login` · `/chat`(流式 + markdown) · `/call`(语音通话) · `/history` · `/profile` · `/records`。流式聊天用 fetch + ReadableStream（不能用 EventSource — 后端 `POST /api/consult/chat/stream` 需要 `Authorization` header），前端有打字机节流（默认 60 字/秒）。AI 回复经 `marked` + `dompurify` 渲染 markdown。
+
+语音/视频通话模块（`src/lib/`）：
+
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| voice-session | `voice-session.ts` | WebSocket 连接管理，对标 Flutter VoiceBloc |
+| audio/recorder | `audio/recorder.ts` | 浏览器麦克风采集 (AudioContext + ScriptProcessor, 16kHz PCM) |
+| audio/player | `audio/player.ts` | PCM→WAV 播放 |
+| video/camera | `video/camera.ts` | getUserMedia 摄像头采集，Canvas 定时截图 JPEG 帧上行 |
+
+> `voice-session.ts` 维护 WebSocket 生命周期和回调（onText/onAudio/onUserText/onAiText/onDone/onError），与后端 `/api/consult/voice/ws` 协议一致。通话页面 `CallPage.vue` 使用这些模块实现完整的语音+视频通话 UI。
 
 ### web 端踩过的坑（修过的真 bug，值得防范）
 
@@ -321,3 +357,5 @@ npm run dev        # http://localhost:5180
   - `{ suggestions: [...] }` — 跟问建议
 - 终止符：`data: [DONE]\n\n`
 - 必须在 response header 设 `X-Accel-Buffering: no` 否则某些反代会缓冲整段才发
+
+## 第二前端: xiaohe-web (Vite + Vue 3)
