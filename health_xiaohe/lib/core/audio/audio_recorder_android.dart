@@ -32,6 +32,16 @@ class AudioRecorder extends AudioRecorderBase {
   }
 
   @override
+  Future<bool> requestPermission() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('requestPermission');
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
   Future<void> startRecording(void Function(String base64) onData) async {
     _channel.setMethodCallHandler((call) async {
       if (call.method != 'onAudio') return;

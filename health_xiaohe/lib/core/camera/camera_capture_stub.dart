@@ -8,6 +8,7 @@ import 'camera_capture_base.dart';
 class CameraCapture extends CameraCaptureBase {
   @override
   Future<bool> hasPermission() async => false;
+  Future<bool> requestPermission() async => false;
 
   @override
   Future<void> startCapture(void Function(String base64Jpeg) onFrame) async {}

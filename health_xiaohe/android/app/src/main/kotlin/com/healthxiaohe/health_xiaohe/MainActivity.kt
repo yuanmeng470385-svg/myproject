@@ -1,9 +1,13 @@
 package com.healthxiaohe.health_xiaohe
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.*
 import android.media.audiofx.AcousticEchoCanceler
 import android.os.Process
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -11,6 +15,10 @@ import kotlinx.coroutines.*
 import java.io.*
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        private const val AUDIO_PERM_REQ = 1001
+    }
+
     // --- AudioEngine: 统一管理录音和播放，解决回声和延迟 ---
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
@@ -95,6 +103,21 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "stop" -> { safeCleanup(); result.success(true) }
+                "requestPermission" -> {
+                    val granted = ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (granted) {
+                        result.success(true)
+                    } else {
+                        ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf(Manifest.permission.RECORD_AUDIO),
+                            AUDIO_PERM_REQ
+                        )
+                        result.success(false) // 本次未授权，等回调
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

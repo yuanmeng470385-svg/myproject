@@ -83,13 +83,16 @@ class _CallPageState extends State<CallPage> {
       final hasPermission = await _audioRecorder.hasPermission();
       debugPrint('[CALL] hasPermission=$hasPermission');
       if (!hasPermission) {
-        debugPrint('[CALL] permission denied');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请允许麦克风权限')),
-          );
+        debugPrint('[CALL] recording permission not yet granted, requesting...');
+        final requested = await _audioRecorder.requestPermission();
+        if (!requested) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('请允许麦克风权限')),
+            );
+          }
+          return;
         }
-        return;
       }
       debugPrint('[CALL] starting audio recorder...');
       var chunkCount = 0;
@@ -112,15 +115,18 @@ class _CallPageState extends State<CallPage> {
 
   Future<void> _startVideo() async {
     try {
-      final hasPermission = await _cameraCapture.hasPermission();
-      if (!hasPermission) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请允许摄像头权限')),
-          );
+      final hasCamPermission = await _cameraCapture.hasPermission();
+      if (!hasCamPermission) {
+        final requested = await _cameraCapture.requestPermission();
+        if (!requested) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('请允许摄像头权限')),
+            );
+          }
+          setState(() => _videoEnabled = false);
+          return;
         }
-        setState(() => _videoEnabled = false);
-        return;
       }
       await _cameraCapture.startCapture((base64Jpeg) {
         if (_audioFlowing && _videoEnabled) {

@@ -36,6 +36,9 @@ class AudioRecorder extends AudioRecorderBase {
   }
 
   @override
+  Future<bool> requestPermission() => hasPermission();
+
+  @override
   Future<void> startRecording(void Function(String base64) onData) async {
     _isRecording = true;
     _chunkCount = 0;

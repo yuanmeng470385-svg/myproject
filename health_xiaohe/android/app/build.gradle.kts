@@ -22,11 +22,7 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.healthxiaohe.health_xiaohe"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // 显式声明最低 API 21 (Android 5.0)，满足"支持最低 API 21"要求；
-        // 项目所有插件(camera/dio/shared_preferences/path_provider 等)均兼容 21。
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -10,6 +10,7 @@ import 'audio_recorder_base.dart';
 class AudioRecorder extends AudioRecorderBase {
   @override
   Future<bool> hasPermission() async => false;
+  Future<bool> requestPermission() async => false;
 
   @override
   Future<void> startRecording(void Function(String base64) onData) async {}
